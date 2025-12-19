@@ -1,0 +1,67 @@
+#include "DFRobot_PH.h"
+#include <EEPROM.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// ---------------- Pins ----------------
+#define PH_PIN A1
+#define COND_PIN A0
+#define TURB_PIN A2
+#define ONE_WIRE_BUS 4
+
+// ---------------- Objects ----------------
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+DFRobot_PH ph;
+
+// ---------------- Variables ----------------
+float voltagePH;
+float phValue;
+float temperature;
+float conductivity;
+float turbidity;
+
+bool sendData = false;   // <-- control flag
+
+void setup()
+{
+  Serial.begin(9600);
+  sensors.begin();
+  ph.begin();
+
+  Serial.println("Send 'h' to start data transmission");
+}
+
+void loop()
+{
+  // -------- Check Serial Command --------
+  if (Serial.available()) {
+    char cmd = Serial.read();
+    if (cmd == 'H') {
+      sendData = true;
+      Serial.println("Data transmission started");
+    }
+  }
+
+  // -------- Send data only if enabled --------
+  if (sendData) {
+    static unsigned long timepoint = millis();
+   temperature= random(10,30);
+    turbidity= random(0.5,500);
+     conductivity= random(10,30);
+      phValue= random(3,14);
+      // Send data
+      Serial.print(temperature, 2);
+      Serial.print(",");
+      Serial.print(conductivity, 1);
+      Serial.print(",");
+      Serial.print(turbidity, 1);
+      Serial.print(",");
+      Serial.println(phValue, 2);
+      delay(500);
+    }
+  }
+
+  // Required for pH calibration
+ 
+
