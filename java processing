@@ -1,0 +1,376 @@
+import processing.serial.*;
+import controlP5.*;
+import java.util.ArrayList;
+
+Serial myPort;
+ControlP5 cp5;
+float red = 0;
+float green = 0;
+float blue = 0;
+ArrayList<Float> temps = new ArrayList<Float>();  // time in seconds
+ArrayList<Float> tempVals = new ArrayList<Float>(); // temperature data
+ArrayList<Float> phVals = new ArrayList<Float>();
+ArrayList<Float> conductivityVals = new ArrayList<Float>();
+Textlabel Titre;
+int maxPoints = 100;
+int startTime;
+float temperature = 0;
+float ph = 0;
+float conductivity = 0;
+float turbidity = 0;
+String selectedFish = "";
+String fishRequirements = "";
+
+Knob knobTemp, knobPh, knobCond;
+Slider turbiditySlider;
+
+void setup() {
+  size(1000, 600);
+  println(Serial.list());
+  // ⚠️ choose the right port index
+   myPort = new Serial(this, Serial.list()[0], 9600);
+  myPort.bufferUntil('\n');
+  startTime = millis();
+  textFont(createFont("Arial", 14));
+  
+  // --- Dashboard controls ---
+  cp5 = new ControlP5(this);
+
+  knobTemp = cp5.addKnob("Temperature")
+    .setPosition(700, 200)
+    .setRange(0, 50)
+    .setRadius(100)
+    .setValue(0)
+    .setColorForeground(color(255, 80, 80))
+    .setColorBackground(color(60))
+    .setColorActive(color(255, 0, 0))
+    .setDragDirection(Knob.HORIZONTAL);
+
+  knobPh = cp5.addKnob("pH")
+    .setPosition(350, 30)
+    .setRange(0, 14)
+    .setRadius(100)
+    .setValue(7)
+    .setColorForeground(color(100, 150, 255))
+    .setColorBackground(color(60))
+    .setColorActive(color(50, 100, 255))
+    .setDragDirection(Knob.HORIZONTAL);
+
+  knobCond = cp5.addKnob("Conductivity")
+    .setPosition(100, 30)
+    .setRange(0, 100)
+    .setRadius(100)
+    .setValue(0)
+    .setColorForeground(color(50, 255, 150))
+    .setColorBackground(color(60))
+    .setColorActive(color(0, 255, 150))
+    .setDragDirection(Knob.HORIZONTAL);
+
+  turbiditySlider = cp5.addSlider("Turbidity")
+    .setPosition(100, 400)
+    .setSize(180, 50)
+    .setRange(0, 1000)
+    .setValue(0)
+    .setColorForeground(color(100, 180, 255))
+    .setColorBackground(color(60))
+    .setColorActive(color(0, 150, 255));
+    
+  cp5.addSlider("R")
+    .setPosition(500, 300)
+    .setSize(20, 100)
+    .setRange(0, 255)
+    .setNumberOfTickMarks(5);
+    
+  cp5.addSlider("G")
+    .setPosition(550, 300)
+    .setSize(20, 100)
+    .setRange(0, 255)
+    .setNumberOfTickMarks(5);
+    
+  cp5.addSlider("B")
+    .setPosition(600, 300)
+    .setSize(20, 100)
+    .setRange(0, 255)
+    .setNumberOfTickMarks(5);
+    
+  Titre = cp5.addTextlabel("label")
+    .setText("background color.")
+    .setPosition(480, 420)
+    .setColorValue(#C18845)
+    .setFont(createFont("Arial-BoldItalicMT-48", 20));
+    
+  cp5.getTab("default")
+    .activateEvent(true)
+    .setLabel("aquarium dashboard")
+    .setId(1);
+    
+  // Create tabs FIRST before moving anything to them
+  cp5.addTab("aquarium stat")
+    .activateEvent(true)
+    .setId(2);
+    
+  cp5.addTab("settings")
+    .activateEvent(true)
+    .setId(3);
+  
+  // Move simple controllers to their respective tabs
+  cp5.getController("R").moveTo("settings");
+  cp5.getController("G").moveTo("settings");
+  cp5.getController("B").moveTo("settings");
+  cp5.getController("label").moveTo("settings");
+  cp5.getController("Temperature").moveTo("aquarium stat");
+  cp5.getController("pH").moveTo("aquarium stat");
+  cp5.getController("Conductivity").moveTo("aquarium stat");
+  cp5.getController("Turbidity").moveTo("aquarium stat");
+  
+  // Create scrollable list directly in settings tab (without group)
+  cp5.addScrollableList("fish type")
+    .setPosition(610, 110)
+    .setSize(130, 100)
+    .setBarHeight(30)
+    .setItemHeight(30)
+    .addItems(java.util.Arrays.asList("Goldfish", "Guppy", "Betta (Fighting Fish)", "Angelfish"))
+    .setType(ControlP5.DROPDOWN)
+    .moveTo("settings");
+    
+     cp5.addButton("buttonA")
+     .setPosition(900,275)
+     .setImages(loadImage("Arrow-Left.png"), loadImage("Arrow-Right.png"), loadImage("Refresh.png"))
+     .updateSize();
+
+}
+
+ void serialEvent(Serial myPort) {
+   String data = myPort.readStringUntil('\n');
+   if (data != null) {
+    data = trim(data);
+    String[] parts = split(data, ',');
+    if (parts.length == 4) {
+      try {
+       temperature = float(parts[0]);
+       ph = float(parts[3]);
+        conductivity = float(parts[1]);
+         turbidity = float(parts[2]);
+      cp5.getController("Temperature").setValue(temperature);
+      cp5.getController("Conductivity").setValue(conductivity);
+      cp5.getController("pH").setValue(ph);
+      cp5.getController("Turbidity").setValue(turbidity);
+       } catch (Exception e) {
+         println("Invalid data: " + data);
+       }
+    }
+  }
+}
+
+void draw() {
+  background(red, green, blue);
+
+  // record time
+  float t = (millis() - startTime) / 1000.0;
+  temps.add(t);
+  tempVals.add(temperature);
+  phVals.add(ph);
+  conductivityVals.add(conductivity);
+
+  if (temps.size() > maxPoints) {
+    temps.remove(0);
+    tempVals.remove(0);
+    phVals.remove(0);
+    conductivityVals.remove(0);
+  }
+
+  // Update dashboard values
+  knobTemp.setValue(temperature);
+  knobPh.setValue(ph);
+  knobCond.setValue(conductivity);
+  turbiditySlider.setValue(turbidity);
+
+  if (turbidity > 50 && turbidity < 500) {
+    turbiditySlider.setColorForeground(color(255, 255, 0)); // yellow
+  } else {
+    turbiditySlider.setColorForeground(color(100, 180, 255)); // blue
+  }
+
+  if (cp5.getTab("default").isActive()) {
+    drawAxes();
+    drawCurves();
+    drawLabels();
+    
+  }
+  
+  // Display fish requirements in aquarium stat tab
+  if (cp5.getTab("aquarium stat").isActive() && !selectedFish.isEmpty()) {
+    fill(255);
+    textSize(18);
+    text("Selected Fish: " + selectedFish, 100, 500);
+    textSize(14);
+    fill(100, 200, 255);
+    text(fishRequirements, 100, 530);
+    fill(255);
+    textSize(16);
+    if (turbidity > 50 && turbidity < 500) {
+      fill(255, 255, 0);
+      text(" Water is turbid! Needs cleaning.", 700, 470);
+    } else if(turbidity > 0.5 && turbidity < 50) {
+      fill(100, 200, 255);
+      text("Water is clear.", 820, 470);
+    }
+  }
+}
+
+void drawAxes() {
+  stroke(180);
+  strokeWeight(1);
+  int graphWidth = 650;
+  int graphHeight = 300;
+  int xStart = 80;
+  int yStart = 250;
+
+  // X axis
+  line(xStart, yStart + graphHeight, xStart + graphWidth, yStart + graphHeight);
+  // Y axis
+  line(xStart, yStart, xStart, yStart + graphHeight);
+
+  // --- X ticks (time) ---
+  if (temps.size() > 0) {
+    int nXTicks = 6;
+    float tMin = temps.get(0);
+    float tMax = temps.get(temps.size() - 1);
+    fill(200);
+    textSize(12);
+    for (int i = 0; i <= nXTicks; i++) {
+      float x = map(i, 0, nXTicks, xStart, xStart + graphWidth);
+      float tVal = map(i, 0, nXTicks, tMin, tMax);
+      line(x, yStart + graphHeight, x, yStart + graphHeight - 5);
+      text(nf(tVal, 1, 1), x - 10, yStart + graphHeight + 20);
+    }
+  }
+
+  // --- Y ticks ---
+  int nYTicks = 5;
+  fill(200);
+  textSize(12);
+  for (int i = 0; i <= nYTicks; i++) {
+    float y = map(i, 0, nYTicks, yStart + graphHeight, yStart);
+    line(xStart - 5, y, xStart, y);
+    text(int(map(i, 0, nYTicks, 0, 100)), xStart - 40, y + 5);
+  }
+
+  fill(255);
+  text("Time (s)", xStart + graphWidth / 2 - 30, yStart + graphHeight + 40);
+  pushMatrix();
+  translate(xStart - 60, yStart + graphHeight / 2);
+  rotate(-HALF_PI);
+  text("Value (%) or (°C)", 0, 0);
+  popMatrix();
+}
+
+void drawCurves() {
+  int graphWidth = 650;
+  int graphHeight = 300;
+  int xStart = 80;
+  int yStart = 250;
+  noFill();
+
+  if (tempVals.size() > 1) {
+    // Temperature (red)
+    stroke(255, 80, 80);
+    strokeWeight(2);
+    beginShape();
+    for (int i = 0; i < tempVals.size(); i++) {
+      float x = map(temps.get(i), temps.get(0), temps.get(temps.size() - 1), xStart, xStart + graphWidth);
+      float y = map(tempVals.get(i), 0, 50, yStart + graphHeight, yStart);
+      vertex(x, y);
+    }
+    endShape();
+
+    // pH (blue)
+    stroke(100, 150, 255);
+    beginShape();
+    for (int i = 0; i < phVals.size(); i++) {
+      float x = map(temps.get(i), temps.get(0), temps.get(temps.size() - 1), xStart, xStart + graphWidth);
+      float y = map(phVals.get(i), 4, 14, yStart + graphHeight, yStart);
+      vertex(x, y);
+    }
+    endShape();
+
+    // Conductivity (green)
+    stroke(0, 255, 150);
+    beginShape();
+    for (int i = 0; i < conductivityVals.size(); i++) {
+      float x = map(temps.get(i), temps.get(0), temps.get(temps.size() - 1), xStart, xStart + graphWidth);
+      float y = map(conductivityVals.get(i), 0, 100, yStart + graphHeight, yStart);
+      vertex(x, y);
+    }
+    endShape();
+  }
+}
+
+void drawLabels() {
+  fill(255);
+  textSize(14);
+  text("Temperature: " + nf(temperature, 1, 1) + " °C", 100, 100);
+  text("pH: " + nf(ph, 1, 1), 100, 130);
+  text("Conductivity: " + nf(conductivity, 1, 1), 100, 160);
+  text("Turbidity: " + nf(turbidity, 1, 1), 100, 190);
+
+  // Legend
+  fill(255, 80, 80);
+  rect(100, 210, 15, 15);
+  fill(255);
+  text("Temperature", 120, 222);
+
+  fill(100, 150, 255);
+  rect(250, 210, 15, 15);
+  fill(255);
+  text("pH", 270, 222);
+
+  fill(0, 255, 150);
+  rect(350, 210, 15, 15);
+  fill(255);
+  text("Conductivity", 370, 222);
+}
+
+void R(float R) {
+  red = R;
+}
+
+void G(float G) {
+  green = G;
+}
+
+void B(float B) {
+  blue = B;
+}
+
+void controlEvent(ControlEvent e) {
+  if (e.isFrom("fish type")) {
+    int selectedIndex = (int)e.getValue();
+    
+    // Update fish name and requirements based on selection
+    switch (selectedIndex) {
+      case 0:
+        selectedFish = "Goldfish";
+        fishRequirements = "pH: 7.0 – 8.0  |  Temperature: 18 – 24 °C  |  Conductivity: 300 – 700 µS/cm";
+        break;
+      case 1:
+        selectedFish = "Guppy";
+        fishRequirements = "pH: 6.8 – 7.8  |  Temperature: 22 – 28 °C  |  Conductivity: 200 – 500 µS/cm";
+        break;
+      case 2:
+        selectedFish = "Betta (Fighting Fish)";
+        fishRequirements = "pH: 7.0 – 8.0  |  Temperature: 24 – 28 °C  |  Conductivity: 200 – 400 µS/cm";
+        break;
+      case 3:
+        selectedFish = "Angelfish";
+        fishRequirements = "pH: 6.5 – 7.5  |  Temperature: 24 – 30 °C  |  Conductivity: 150 – 300 µS/cm";
+        break;
+    }
+    println("Selected: " + selectedFish);
+    println(fishRequirements);
+  }
+}
+
+public void buttonA(int theValue) {
+  println("a button event from buttonA: "+theValue);
+   myPort.write('H');}
